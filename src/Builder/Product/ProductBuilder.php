@@ -20,14 +20,15 @@ class ProductBuilder implements BuilderInterface
     protected Storage $storage;
     protected ManagerRegistry $doctrine;
 
-    public function __construct(ManagerRegistry $doctrine)
+    public function __construct(
+        ManagerRegistry $doctrine, Product $product, Model $model, Location $location, Ram $ram, Storage $storage)
     {
         $this->doctrine = $doctrine;
-        $this->product = new Product();
-        $this->model = new Model();
-        $this->location = new Location();
-        $this->ram = new Ram();
-        $this->storage = new Storage();
+        $this->product = $product;
+        $this->model = $model;
+        $this->location = $location;
+        $this->ram = $ram;
+        $this->storage = $storage; 
     }
 
     public function createProduct(\DateTime $version, string $priceData): void 

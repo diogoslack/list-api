@@ -59,7 +59,9 @@ class ProductRepository extends ServiceEntityRepository
         ?int $minStorage,
         ?int $maxStorage,
         ?array $ram,
-        ?string $hardDiskType
+        ?string $hardDiskType,
+        ?int $firstRow,
+        ?int $maxRows,
     ): array {
         $entityManager = $this->getEntityManager();
         $params = ['version' => $version];
@@ -112,9 +114,77 @@ class ProductRepository extends ServiceEntityRepository
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
 
-        $query = $entityManager->createQuery($sql)->setParameters($params);
+        $sql .= ' ORDER BY p.id ASC';
+
+        $query = $entityManager
+            ->createQuery($sql)
+            ->setParameters($params)
+            ->setFirstResult($firstRow)
+            ->setMaxResults($maxRows);
 
         return $query->getResult();
+    }
+
+    public function getAllProductsFilteredCount(
+        \DateTime $version,
+        ?string $location,
+        ?int $minStorage,
+        ?int $maxStorage,
+        ?array $ram,
+        ?string $hardDiskType
+    ): int {
+        $entityManager = $this->getEntityManager();
+        $params = ['version' => $version];
+        $where = ['p.version = :version'];
+
+        if ($location) {
+            array_push($where, 'l.name = :location');
+            $params['location'] = $location;
+        }
+
+        if ($minStorage >= 0 && $maxStorage >= 1) {
+            if ($minStorage == 0) {
+                array_push($where, '(s.size BETWEEN ?1 AND ?2 OR s.size IS NULL)');
+            } else {
+                array_push($where, 's.size BETWEEN ?1 AND ?2');
+            }
+            $params[1] = $minStorage;
+            $params[2] = $maxStorage;
+        }
+
+        if ($ram && is_array($ram) && count($ram) > 0) {
+            array_push($where, 'r.size IN (:ram)');
+            $params['ram'] = $ram;
+        }
+
+        if ($hardDiskType) {
+            array_push($where, 's.type = :hardDiskType');
+            $params['hardDiskType'] = $hardDiskType;
+        }
+
+        $sql = '
+            SELECT
+                count(p.id) 
+            FROM
+                App\Entity\Product p
+            INNER JOIN
+                p.model m
+            INNER JOIN
+                p.ram r
+            LEFT JOIN
+                p.storage s
+            INNER JOIN
+                p.location l
+        ';
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $query = $entityManager
+            ->createQuery($sql)
+            ->setParameters($params);
+
+        return $query->getSingleScalarResult();
     }
 
     public function getAllProductsLocations(

@@ -5,6 +5,11 @@ use App\Builder\Product\Director;
 use App\Builder\Product\ProductBuilder;
 use App\Builder\Product\ProductNoStorageBuilder;
 use App\Entity\Product;
+use App\Entity\Model;
+use App\Entity\Location;
+use App\Entity\Ram;
+use App\Entity\Storage;
+use App\Helper\PaginationHelper;
 use App\Helper\RamHelper;
 use App\Helper\StorageHelper;
 use Doctrine\Persistence\ManagerRegistry;
@@ -18,7 +23,8 @@ use Symfony\Component\Routing\Annotation\Route;
 
 class ProductController extends AbstractController
 {
-    const HARD_DISK_FILTER_TYPES = ['SAS', 'SATA', 'SSD'];    
+    const HARD_DISK_FILTER_TYPES = ['SAS', 'SATA', 'SSD'];
+    const RESULTS_PER_PAGE = 20;
 
     /**
      * Get the most recent product list 
@@ -33,6 +39,7 @@ class ProductController extends AbstractController
         $filterStorage = $request->query->get('storage');
         $filterRam = $request->query->get('ram');
         $filterHardDiskType = $request->query->get('harddisktype');
+        $currentPage = (int) $request->query->get('page') > 0 ? (int) $request->query->get('page') : 1;
 
         $version = $doctrine->getRepository(Product::class)->getLastProductVersion();
 
@@ -71,8 +78,8 @@ class ProductController extends AbstractController
             $hardDiskType = null;
         }
         
-        try {
-            $result = $doctrine->getRepository(Product::class)->getAllProductsFiltered(
+        try {            
+            $totalRows = $doctrine->getRepository(Product::class)->getAllProductsFilteredCount(
                 $version,
                 $filterLocation,
                 $minStorage,
@@ -80,8 +87,21 @@ class ProductController extends AbstractController
                 $ram,
                 $hardDiskType
             );
+
+            $pagination = PaginationHelper::getPagination($currentPage, self::RESULTS_PER_PAGE, $totalRows);
+
+            $result = $doctrine->getRepository(Product::class)->getAllProductsFiltered(
+                $version,
+                $filterLocation,
+                $minStorage,
+                $maxStorage,
+                $ram,
+                $hardDiskType,
+                PaginationHelper::getOffset($currentPage, self::RESULTS_PER_PAGE),
+                self::RESULTS_PER_PAGE
+            );
     
-            return new JsonResponse($result, Response::HTTP_OK);
+            return new JsonResponse(['result' => $result, 'pagination' => $pagination], Response::HTTP_OK);
         } catch (\Exception $e) {
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }        
@@ -165,7 +185,15 @@ class ProductController extends AbstractController
             }
 
             try {
-                $builder = $fileStorage ? new ProductBuilder($doctrine) : new ProductNoStorageBuilder($doctrine);
+                $product = new Product();
+                $model = new Model();
+                $location = new Location();
+                $ram = new Ram();
+                $storage = new Storage();
+                
+                $builder = $fileStorage ? 
+                    new ProductBuilder($doctrine, $product, $model, $location, $ram, $storage) :
+                    new ProductNoStorageBuilder($doctrine, $product, $model, $location, $ram, $storage);
                 $product = (new Director())->build($builder, $version, $filePrice, $fileModel, $fileLocation, $fileRam, $fileStorage);
                 $entityManager->persist($product);
                 $entityManager->flush();
