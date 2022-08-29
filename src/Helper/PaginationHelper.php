@@ -5,7 +5,7 @@ class PaginationHelper {
 
     public static function getPagination(int $current, int $limitPerPage, int $totalRows): array
     {
-        $totalPages = ceil($totalRows / $limitPerPage);
+        $totalPages = (int) ceil($totalRows / $limitPerPage);
         $next = $current + 1;
         $previous = $current - 1;
         return [

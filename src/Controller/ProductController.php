@@ -121,11 +121,10 @@ class ProductController extends AbstractController
             return new JsonResponse([], Response::HTTP_OK);  
         } else {
             $version = new \DateTime($version[1]);
-        }        
-
+        }
         try {
             $result = $doctrine->getRepository(Product::class)->getAllProductsLocations($version);
-            return new JsonResponse($result, Response::HTTP_OK);
+            return new JsonResponse(['result' => $result], Response::HTTP_OK);
         } catch (\Exception $e) {
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
